@@ -19,6 +19,7 @@ Args:
   -u, --username  Username
   -p, --password  Password
   -H, --hostname  Hostname
+  -d, --device    Device
   -m, --mount     Mountpoint
   -s, --step      Start from step
 
@@ -27,11 +28,13 @@ Steps:
   2) install base packages and Gnome
   3) generate /etc/fstab
   4) configure system
+  5) install AUR packages and configure user
 EOF
 }
 
 username='archlinux'
 password='1qasw23ed'
+device='/dev/nvme0n1'
 mount='/mnt'
 step=1
 
@@ -52,6 +55,10 @@ do
       ;;
     -H | --hostname)
       hostname="$2"
+      shift
+      ;;
+    -d | --device)
+      device="$2"
       shift
       ;;
     -m | --mount | --mount)
@@ -135,6 +142,33 @@ then
   echo 'Completed!'
 fi
 
+# TODO: добавить выбор DE
+
+# case "$DESKTOP" in
+#   kde )
+#     pacman -S --noconfirm plasma plasma-nm kde-applications-meta ssdm
+#     systemctl enable NetworkManager
+#     systemctl enable sddm
+#     ;;
+#   xfce )
+#     pacman -S --noconfirm xfce4 xfce4-goodies networkmanager network-manager-applet xfce4-notifyd gnome-keyring
+#     sed -i /etc/lxdm/lxdm.conf -e 's;^# session=/usr/bin/startlxde;session=/usr/bin/startxfce4;g'
+#     systemctl enable NetworkManager
+#     systemctl enable lxdm
+#     ;;
+#   # Самый красивый и самый глючный. У меня сломался через пару дней после установки
+#   deepin )
+#     pacman -S --noconfirm deepin deepin-extra networkmanager lightdm
+#     sed -i 's/^#greeter-session=.*/greeter-session=lightdm-deepin-greeter/' /etc/lightdm/lightdm.conf
+#     systemctl enable NetworkManager
+#     systemctl enable lightdm
+#     ;;
+#   * )
+#     pacman -S --noconfirm gnome gnome-extra
+#     systemctl enable NetworkManager
+#     systemctl enable gdm
+#     ;;
+
 if [[ $step -le 2 ]]
 then
   echo '########################################################################'
@@ -145,25 +179,37 @@ then
   echo
 
   packages=(
+    adapta-gtk-theme
+    arc-icon-theme
+    arc-gtk-theme
+    # for qt apps
+    # arc-kde-theme
     base
     base-devel
     btrfs-progs
     chromium
+    # LUKS
     cryptsetup
     docker-compose
     efibootmgr
     exfat-utils
+    gimp
     git
     gnome
     gnome-extra
+    gparted
     grub
+    gvm
     libldm
     linux
     linux-firmware
     linux-headers
     man-db
     man-pages
+    # materia-kde-theme for qt apps
+    materia-gtk-theme
     mlocate
+    mpv
     nano
     networkmanager-openvpn
     networkmanager-pptp
@@ -171,20 +217,34 @@ then
     noto-fonts-emoji
     ntfs-3g
     os-prober
+    papirus-icon-theme
     pkgfile
     proxychains-ng
+    # настройка тем для qt-приложений
+    qt5ct
     reflector
     snapper
     systemd-swap
+    telegram-desktop
     terminus-font
+    ttf-fira-code
+    ttf-fira-mono
+    ttf-ibm-plex
+    ttf-inconsolata
+    ttf-roboto
+    ttf-roboto-mono
+    ttf-ubuntu-font-family
     tor
-    vim
+    # vim
     wget
     xorg
     zsh
   )
 
+  set +e
   pacstrap "$mount" "${packages[@]}"
+  set -e
+
   echo 'Completed!'
 fi
 
@@ -206,8 +266,15 @@ timedatectl set-timezone UTC
 timedatectl set-ntp on
 timedatectl set-local-rtc 1
 
-locale-gen en_US en_US.UTF-8 ru_RU ru_RU.UTF-8
-localectl set-locale LANG=en_US.UTF-8
+cat << EOF > /etc/locale.gen
+en_US.UTF-8 UTF-8
+ru_RU.UTF-8 UTF-8
+EOF
+
+locale-gen
+
+# localectl set-locale LANG=en_US.UTF-8
+echo 'LANG=en_US.UTF-8' > /etc/locale.conf
 
 cat > /etc/vconsole.conf << EOF
 LOCALE="en_US.UTF-8"
@@ -252,14 +319,14 @@ vm.swappiness = 10
 vm.vfs_cache_pressure = 1000
 EOF
 
-systemctl enable man-db.timer
-
-systemctl enable fstrim.timer
-
 mkdir -p /var/swap /etc/systemd/swap.conf.d
 echo 'swapfc_enabled=1' > /etc/systemd/swap.conf.d/myswap.conf
 echo 'swapfc_path=/var/swap/' >> /etc/systemd/swap.conf.d/myswap.conf
 systemctl enable systemd-swap
+
+systemctl enable man-db.timer
+
+systemctl enable fstrim.timer
 
 pkgfile --update
 systemctl enable pkgfile-update.timer
@@ -313,7 +380,8 @@ snapper -c home create-config -t custom /home
 systemctl enable snapper-timeline.timer
 systemctl enable snapper-cleanup.timer
 
-sed -r 's/^(PRUNENAMES = "[^"]+)/\1 .snapshots/' /etc/updatedb.conf
+# запрещаем mlocate индексировать снапшоты
+sed -ir 's/^PRUNENAMES = "/\0.snapshots /g' /etc/updatedb.conf
 
 systemctl enable updatedb.timer
 
@@ -357,6 +425,8 @@ EOF
 
 systemctl enable ldmtool.service
 
+echo 'export QT_QPA_PLATFORMTHEME="qt5ct"' > /etc/profile.d/qt5ct.sh
+
 systemctl enable gdm
 systemctl enable NetworkManager
 systemctl enable tor
@@ -373,8 +443,116 @@ then
   echo
 
   arch-chroot "$mount" bash <<< "$configure_system_commands"
-  echo 'Completed.'
+  echo 'Completed!'
+fi
+
+user_commands=$(cat << COMMANDS
+cd /tmp
+git clone https://aur.archlinux.org/yay-bin.git
+cd yay-bin
+makepkg -si --noconfirm
+cd -
+rm -rf /tmp/yay-bin
+
+# TODO: убрать все пакеты из стандартного репо
+packages=(
+  asdf-vm
+  cht.sh
+  fd
+  # firefox-nightly
+  fzf
+  gitflow-avh
+  github-cli-bin
+  chrome-gnome-shell
+  gotop-bin
+  htop
+  httpie
+  hub
+  hyperfine
+  jo
+  jq
+  mc
+  neofetch
+  nmap
+  nvme-cli
+  parallel
+  pass
+  pet-bin
+  pwgen
+  sqlmap
+  thefuck
+  tokei
+  # tor-browser
+  ttf-cascadia-code
+  ttf-jetbrains-mono-git
+  vim-plug
+  visual-studio-code-bin
+  vi-vim-symlink
+  whois
+  wrk
+  xcursor-breeze
+  zplug
+)
+
+yay -S --noconfirm "\${packages[@]}"
+
+mkdir -p ~/.config/fontconfig
+
+cat > ~/.config/fontconfig/fonts.conf << EOF
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <alias>
+    <family>sans-serif</family>
+    <prefer>
+      <family>Noto Sans</family>
+      <family>Noto Color Emoji</family>
+    </prefer>
+  </alias>
+  <alias>
+    <family>serif</family>
+    <prefer>
+      <family>Noto Serif</family>
+      <family>Noto Color Emoji</family>
+    </prefer>
+  </alias>
+  <alias>
+    <family>monospace</family>
+    <prefer>
+      <family>Noto Sans Mono</family>
+      <family>Noto Color Emoji</family>
+    </prefer>
+  </alias>
+</fontconfig>
+EOF
+
+cat > ~/.config/chromium-flags.conf << EOF
+--ignore-gpu-blacklist
+--enable-gpu-rasterization
+--enable-native-gpu-memory-buffers
+--enable-zero-copy
+--disable-gpu-driver-bug-workarounds
+EOF
+
+COMMANDS
+)
+
+if [[ $step -le 5 ]]
+then
+  echo '########################################################################'
+  echo '#                                                                      #'
+  echo '# Step 5: install AUR packages and configure user                      #'
+  echo '#                                                                      #'
+  echo '########################################################################'
+  echo
+
+  # временно отключаем запрос пароля
+  # `echo "password" | sudo -S <command>` не всегда работает
+  arch-chroot "$mount" bash -c "echo '$username ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/666-bypass"
+  arch-chroot "$mount" su -l "$username" -c "$user_commands"
+  arch-chroot "$mount" bash -c 'rm /etc/sudoers.d/666-bypass'
+  echo 'Completed'
 fi
 
 echo
-echo 'Reboot and run ./install/post-install.sh'
+echo 'Finished. U can reboot'

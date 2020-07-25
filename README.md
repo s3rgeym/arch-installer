@@ -1,17 +1,20 @@
 # Arch Installer
 
+Usage:
+
+```zsh
+$ ./arch-install.sh -h
+```
+
 Если уже установлен Arch Linux, то ставим пакет:
 
 ```zsh
 $ yay -S arch-install-scripts
 ```
 
-Далее монтируем `/boot/efi`, `/home`, `/var/swap` и запускаем `./install/arch-install.sh`.
-
-Справка по аргументам:
+Далее монтируем `/boot/efi`, `/home`, `/var/swap` и запускаем:
 
 ```zsh
-$ ./install/arch-install.sh -h
-```
 
-После установки, заходим под пользователем и запускаем `./install/post-install.sh`.
+$ sudo ./arch-install.sh --username <newuser> --password <newuser-pass> --mount /path/to/mnt --step 2
+```
