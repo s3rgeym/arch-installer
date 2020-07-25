@@ -193,6 +193,8 @@ then
     docker-compose
     efibootmgr
     exfat-utils
+    fd
+    fzf
     gimp
     git
     gnome
@@ -200,6 +202,8 @@ then
     gparted
     grub
     gvm
+    htop
+    jq
     libldm
     linux
     linux-firmware
@@ -208,21 +212,28 @@ then
     man-pages
     # materia-kde-theme for qt apps
     materia-gtk-theme
+    mc
     mlocate
     mpv
     nano
+    neofetch
     networkmanager-openvpn
     networkmanager-pptp
     noto-fonts
     noto-fonts-emoji
     ntfs-3g
+    nvme-cli
     os-prober
     papirus-icon-theme
     pkgfile
+    parallel
+    pass
     proxychains-ng
+    pwgen
     # настройка тем для qt-приложений
     qt5ct
     reflector
+    rsync
     snapper
     systemd-swap
     telegram-desktop
@@ -237,6 +248,7 @@ then
     tor
     # vim
     wget
+    whois
     xorg
     zsh
   )
@@ -293,6 +305,10 @@ cat > /etc/hosts << EOF
 127.0.1.1 $hostname.localdomain $hostname
 EOF
 
+echo '[main]' >> /etc/NetworkManager/NetworkManager.conf
+echo 'dns=none' >> /etc/NetworkManager/NetworkManager.conf
+
+# DNS от Cloudflare
 cat > /etc/resolv.conf << EOF
 nameserver 1.1.1.1
 nameserver 1.0.0.1
@@ -454,41 +470,31 @@ makepkg -si --noconfirm
 cd -
 rm -rf /tmp/yay-bin
 
+# problem importing keys fix
+gpg --auto-key-locate nodefault,wkd --locate-keys torbrowser@torproject.org
+
 # TODO: убрать все пакеты из стандартного репо
 packages=(
   asdf-vm
   cht.sh
-  fd
   # firefox-nightly
-  fzf
   gitflow-avh
   github-cli-bin
   chrome-gnome-shell
   gotop-bin
-  htop
   httpie
   hub
   hyperfine
-  jo
-  jq
-  mc
-  neofetch
-  nmap
-  nvme-cli
-  parallel
-  pass
+  micro
   pet-bin
-  pwgen
-  sqlmap
   thefuck
   tokei
-  # tor-browser
+  tor-browser
   ttf-cascadia-code
   ttf-jetbrains-mono-git
   vim-plug
   visual-studio-code-bin
   vi-vim-symlink
-  whois
   wrk
   xcursor-breeze
   zplug
@@ -548,9 +554,9 @@ then
 
   # временно отключаем запрос пароля
   # `echo "password" | sudo -S <command>` не всегда работает
-  arch-chroot "$mount" bash -c "echo '$username ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/666-bypass"
+  arch-chroot "$mount" bash -c "echo '$username ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/$username"
   arch-chroot "$mount" su -l "$username" -c "$user_commands"
-  arch-chroot "$mount" bash -c 'rm /etc/sudoers.d/666-bypass'
+  arch-chroot "$mount" bash -c "rm /etc/sudoers.d/$username"
   echo 'Completed'
 fi
 
