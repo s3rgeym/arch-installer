@@ -470,7 +470,7 @@ makepkg -si --noconfirm
 cd -
 rm -rf /tmp/yay-bin
 
-# problem importing keys fix
+# fiz importing keys
 gpg --auto-key-locate nodefault,wkd --locate-keys torbrowser@torproject.org
 
 # TODO: убрать все пакеты из стандартного репо
