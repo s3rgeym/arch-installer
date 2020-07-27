@@ -238,6 +238,8 @@ then
     systemd-swap
     telegram-desktop
     terminus-font
+    tor
+    torsocks
     ttf-fira-code
     ttf-fira-mono
     ttf-ibm-plex
@@ -245,7 +247,6 @@ then
     ttf-roboto
     ttf-roboto-mono
     ttf-ubuntu-font-family
-    tor
     # vim
     wget
     whois
